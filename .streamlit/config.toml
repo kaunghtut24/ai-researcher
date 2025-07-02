@@ -1,0 +1,16 @@
+[server]
+port = 10000
+address = "0.0.0.0"
+headless = true
+enableCORS = false
+maxUploadSize = 200
+maxMessageSize = 200
+
+[browser]
+gatherUsageStats = false
+
+[logger]
+level = "info"
+
+[theme]
+base = "light"

@@ -7,8 +7,10 @@ from crewai import Agent, Task, Crew, Process, LLM
 from crewai.tools import BaseTool
 import litellm
 
+# Set logging level based on environment (DEBUG for development, INFO for production)
 import os
-os.environ['LITELLM_LOG'] = 'DEBUG'
+log_level = os.getenv('LITELLM_LOG', 'INFO')
+os.environ['LITELLM_LOG'] = log_level
 
 # Load environment variables (for non-LinkUp settings)
 load_dotenv()

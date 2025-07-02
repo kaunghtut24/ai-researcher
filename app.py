@@ -3,13 +3,24 @@ from agents import run_research
 import os
 import weasyprint
 from markdown_it import MarkdownIt
-import pyperclip
 import json
 import requests
 import io
 
+# Try to import pyperclip, but handle gracefully if it fails (server environment)
+try:
+    import pyperclip
+    CLIPBOARD_AVAILABLE = True
+except ImportError:
+    CLIPBOARD_AVAILABLE = False
+
 # Set up page configuration
 st.set_page_config(page_title="🔍 Agentic Deep Researcher", layout="wide")
+
+# Health check endpoint for deployment monitoring
+if st.query_params.get("health") == "check":
+    st.write("OK")
+    st.stop()
 
 # --- Persistence --- #
 
@@ -179,8 +190,14 @@ for i, message in enumerate(st.session_state.messages):
                 )
             with col2:
                 if st.button("Copy", key=f"copy_{i}"):
-                    pyperclip.copy(message["content"])
-                    st.success("Copied to clipboard!")
+                    if CLIPBOARD_AVAILABLE:
+                        try:
+                            pyperclip.copy(message["content"])
+                            st.success("Copied to clipboard!")
+                        except Exception as e:
+                            st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
+                    else:
+                        st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
 
 
 # Accept user input and process the research query
@@ -219,8 +236,14 @@ if prompt := st.chat_input("Ask a question about your documents..."):
             )
         with col2:
             if st.button("Copy", key="copy_latest"):
-                pyperclip.copy(response)
-                st.success("Copied to clipboard!")
+                if CLIPBOARD_AVAILABLE:
+                    try:
+                        pyperclip.copy(response)
+                        st.success("Copied to clipboard!")
+                    except Exception as e:
+                        st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
+                else:
+                    st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
 
     st.session_state.messages.append(
         {"role": "assistant", "content": response})

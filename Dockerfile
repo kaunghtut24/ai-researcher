@@ -19,22 +19,36 @@ RUN apt-get update && apt-get install -y \
     libgdk-pixbuf2.0-0 \
     fonts-liberation \
     fonts-freefont-ttf \
+    xvfb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements.txt and install dependencies
+# Copy requirements.txt and install dependencies first (for better caching)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the app
 COPY . .
 
-# Expose Streamlit default port (change if needed)
-EXPOSE 8501
+# Make startup script executable
+RUN chmod +x start.sh
 
-# Default command (can be changed in render.yaml)
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.enableCORS=false"]
+# Create a non-root user for security
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app
+USER app
+
+# Expose port 10000 for Render
+EXPOSE 10000
+
+# Health check for deployment monitoring
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:10000/?health=check || exit 1
+
+# Command optimized for Render deployment
+CMD ["./start.sh"]
 
