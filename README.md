@@ -1,52 +1,46 @@
 # Agentic Deep Researcher
 
-We're building an MCP-powered multi-agent deep researcher, it can perform deep web searches using [Linkup](https://www.linkup.so/) amd the agents are orchestrated using CrewAI.
+This project features a multi-agent deep researcher powered by CrewAI, capable of performing deep web searches using Linkup. The application consists of a FastAPI backend for the agent orchestration and a Streamlit frontend for an interactive user interface.
 
 We use:
 
 - [LinkUp](https://www.linkup.so/) (Search Tool)
 - CrewAI (Agentic design)
-- Deepseek R1 (LLM)
-- Streamlit to wrap the logic in an interactive UI
+- OpenAI (LLM) - Configurable via `OPENAI_API_KEY`
+- FastAPI for the backend API
+- Streamlit for the interactive UI
 
 ### SetUp
 
-Run these commands in project root
-
-```
-uv sync
-```
-
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository_url>
+    cd ai-researcher
+    ```
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  **Set up environment variables:**
+    Create a `.env` file in the project root or set the following environment variables:
+    ```
+    LINKUP_API_KEY=your_linkup_api_key_here
+    OPENAI_API_KEY=your_openai_api_key_here
+    ```
+    [Get your Linkup API keys here](https://www.linkup.so/)
+    [Get your OpenAI API keys here](https://platform.openai.com/account/api-keys)
 
 ### Run the Application
 
-Run the application with:
+To run the application, you need to start both the FastAPI backend and the Streamlit frontend.
 
 ```bash
+# Start the FastAPI server in the background
+python server.py &
+
+# Start the Streamlit app
 streamlit run app.py
 ```
-
-### Use as MCP server
-
-```json
-{
-  "mcpServers": {
-    "crew_research": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "./Multi-Agent-deep-researcher-mcp-windows-linux",
-        "run",
-        "server.py"
-      ],
-      "env": {
-        "LINKUP_API_KEY": "your_linkup_api_key_here"
-      }
-    }
-  }
-}
-```
-[Get your Linkup API keys here](https://www.linkup.so/)
 
 ## 📬 Stay Updated with Our Newsletter!
 
