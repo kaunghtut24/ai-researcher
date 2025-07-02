@@ -77,98 +77,51 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
 
         # Set up environment variables for LiteLLM
         import os
-        import litellm
 
-        # Configure LiteLLM for custom provider
-        litellm.api_key = openai_api_key
-        litellm.api_base = openai_base_url
+        # For LiteLLM with custom endpoints, we MUST use the openai/ prefix
+        # This tells LiteLLM to use the OpenAI client with custom base URL
+        litellm_model = f"openai/{model}"
 
-        # Also set environment variables as backup
-        os.environ["OPENAI_API_KEY"] = openai_api_key
-        os.environ["OPENAI_API_BASE"] = openai_base_url
-
-        # For Hyperbolic specifically, we might need to set custom headers
-        if "hyperbolic" in openai_base_url.lower():
-            os.environ["HYPERBOLIC_API_KEY"] = openai_api_key
-
-        # For Hyperbolic and other custom providers, use the original model name
-        # LiteLLM will handle the routing based on the base URL
-        print(f"Configuring LiteLLM with model: {model}")
+        print(f"Using LiteLLM model format: {litellm_model}")
         print(f"Base URL: {openai_base_url}")
         print(f"API Key: {'*' * (len(openai_api_key) - 4) + openai_api_key[-4:] if openai_api_key else 'None'}")
 
-        # Determine the correct model format based on provider
-        if "hyperbolic" in openai_base_url.lower():
-            # For Hyperbolic, use the model name as-is with custom configuration
-            model_name = model
-            provider_prefix = ""
-        else:
-            # For other OpenAI-compatible providers, use openai/ prefix
-            model_name = model
-            provider_prefix = "openai/"
+        # Set environment variables that LiteLLM expects
+        os.environ["OPENAI_API_KEY"] = openai_api_key
+        os.environ["OPENAI_API_BASE"] = openai_base_url
 
         try:
-            # First attempt: Use model as-is (works for most custom providers)
-            config = {
-                "model": model_name,
-                "api_key": openai_api_key,
-                "api_base": openai_base_url,
-                "temperature": 0.1,
-                "max_tokens": 4000
-            }
-
-            print(f"Attempting LLM creation with config: {config}")
-            return LLM(**config)
-
+            # Use the openai/ prefix format that LiteLLM requires
+            return LLM(
+                model=litellm_model,  # Must use openai/ prefix for custom endpoints
+                openai_api_key=openai_api_key,
+                openai_api_base=openai_base_url,
+                temperature=0.1,
+                max_tokens=4000
+            )
         except Exception as e1:
-            print(f"First attempt failed: {e1}")
-
-            # Second attempt: Try with openai/ prefix
+            print(f"First attempt with openai_api_base failed: {e1}")
             try:
-                litellm_model = f"openai/{model}"
-                config = {
-                    "model": litellm_model,
-                    "openai_api_key": openai_api_key,
-                    "openai_api_base": openai_base_url,
-                    "temperature": 0.1,
-                    "max_tokens": 4000
-                }
-                print(f"Second attempt with openai/ prefix: {litellm_model}")
-                return LLM(**config)
-
+                # Fallback with different parameter name
+                return LLM(
+                    model=litellm_model,
+                    openai_api_key=openai_api_key,
+                    base_url=openai_base_url,
+                    temperature=0.1,
+                    max_tokens=4000
+                )
             except Exception as e2:
-                print(f"Second attempt failed: {e2}")
-
-                # Third attempt: Use environment variables only
+                print(f"Second attempt with base_url failed: {e2}")
                 try:
-                    config = {
-                        "model": model,
-                        "temperature": 0.1,
-                        "max_tokens": 4000
-                    }
-                    print(f"Third attempt with env vars only: {config}")
-                    return LLM(**config)
-
+                    # Final fallback using environment variables only
+                    return LLM(
+                        model=litellm_model,
+                        temperature=0.1,
+                        max_tokens=4000
+                    )
                 except Exception as e3:
-                    print(f"Third attempt failed: {e3}")
-
-                    # Final attempt: Try with custom provider format
-                    try:
-                        # Some providers need specific format
-                        custom_model = f"custom/{model}"
-                        config = {
-                            "model": custom_model,
-                            "api_key": openai_api_key,
-                            "base_url": openai_base_url,
-                            "temperature": 0.1,
-                            "max_tokens": 4000
-                        }
-                        print(f"Final attempt with custom/ prefix: {custom_model}")
-                        return LLM(**config)
-
-                    except Exception as e4:
-                        print(f"All attempts failed: {e1}, {e2}, {e3}, {e4}")
-                        raise ValueError(f"Failed to configure LLM for {model} at {openai_base_url}. Please check your API key and model name.")
+                    print(f"All attempts failed: {e1}, {e2}, {e3}")
+                    raise ValueError(f"Failed to configure LLM for {model} at {openai_base_url}. LiteLLM requires 'openai/' prefix for custom endpoints.")
 
     else:
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")
