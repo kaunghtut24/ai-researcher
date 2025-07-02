@@ -16,16 +16,20 @@ os.environ['LITELLM_LOG'] = log_level
 load_dotenv()
 
 
-def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None):
+def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, ollama_base_url: str = None):
     """Initialize and return the LLM client based on the selected provider."""
     if llm_provider == "Ollama":
-        # NOTE: Ollama base_url is set to localhost here. In a production environment
-        # like Render, this will need to be an accessible URL for your Ollama instance.
-        # If Ollama is running as a separate service, its URL should be provided here.
-        return LLM(
-            model=model,
-            # base_url="http://localhost:11434" # Removed for now, user needs to configure if external
-        )
+        # Handle Ollama configuration
+        base_url = ollama_base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+        try:
+            return LLM(
+                model=model,
+                base_url=base_url
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to connect to Ollama at {base_url}. Please ensure Ollama is running and accessible. Error: {str(e)}")
+
     elif llm_provider == "OpenAI":
         if not openai_api_key:
             raise ValueError("OpenAI API Key is required for OpenAI models.")
@@ -33,6 +37,7 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
             model=model,
             openai_api_key=openai_api_key
         )
+
     elif llm_provider == "OpenAI Compatible":
         if not openai_api_key:
             raise ValueError("API Key is required for OpenAI Compatible models.")
@@ -43,6 +48,7 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
             api_key=openai_api_key,
             base_url=openai_base_url
         )
+
     else:
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")
 
@@ -84,13 +90,13 @@ class LinkUpSearchTool(BaseTool):
             return f"Error occurred while searching: {str(e)}"
 
 
-def create_research_crew(query: str, llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, document_content: str = ""):
+def create_research_crew(query: str, llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, document_content: str = "", ollama_base_url: str = None):
     """Create and configure the research crew with all agents and tasks"""
     # Initialize tools
     linkup_search_tool = LinkUpSearchTool()
 
     # Get LLM client
-    client = get_llm_client(llm_provider, model, openai_api_key, openai_base_url)
+    client = get_llm_client(llm_provider, model, openai_api_key, openai_base_url, ollama_base_url)
 
     web_searcher = Agent(
         role="Web Searcher",
@@ -159,11 +165,11 @@ def create_research_crew(query: str, llm_provider: str, model: str, openai_api_k
     return crew
 
 
-def run_research(query: str, llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, document_content: str = ""):
+def run_research(query: str, llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, document_content: str = "", ollama_base_url: str = None):
     """Run the research process and return results"""
     print(f"Starting research for query: {query} with model: {model} using provider: {llm_provider}")
     try:
-        crew = create_research_crew(query, llm_provider, model, openai_api_key, openai_base_url, document_content)
+        crew = create_research_crew(query, llm_provider, model, openai_api_key, openai_base_url, document_content, ollama_base_url)
         print("Crew created successfully.")
         result = crew.kickoff()
         print("Crew kickoff completed.")

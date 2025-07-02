@@ -33,6 +33,7 @@ def save_user_data():
         "selected_llm_provider": st.session_state.selected_llm_provider,
         "openai_api_key": st.session_state.openai_api_key,
         "openai_base_url": st.session_state.openai_base_url,
+        "ollama_base_url": st.session_state.ollama_base_url,
         "messages": st.session_state.messages,
         "uploaded_document_content": st.session_state.uploaded_document_content
     }
@@ -47,17 +48,30 @@ def load_user_data():
 
 # --- Model Selection --- #
 
-# NOTE: Ollama is assumed to be a separate service.
-# If running on Render, this will likely fail unless Ollama is also deployed and accessible.
-@st.cache_data
-def get_ollama_models():
+# Ollama connection management
+def test_ollama_connection(url="http://localhost:11434"):
+    """Test connection to Ollama service"""
     try:
-        response = requests.get("http://localhost:11434/api/tags")
+        response = requests.get(f"{url}/api/tags", timeout=5)
         response.raise_for_status()
-        return [model["name"] for model in response.json()["models"]]
+        return True
+    except Exception:
+        return False
+
+@st.cache_data
+def get_ollama_models(url="http://localhost:11434"):
+    """Get available models from Ollama service"""
+    try:
+        response = requests.get(f"{url}/api/tags", timeout=10)
+        response.raise_for_status()
+        models_data = response.json()
+        if "models" in models_data and models_data["models"]:
+            return [model["name"] for model in models_data["models"]]
+        else:
+            return []
     except Exception as e:
-        st.warning(f"Could not connect to Ollama at http://localhost:11434. Please ensure Ollama is running if you intend to use it. Error: {e}")
-        return [] # Return empty list if Ollama is not available
+        # Don't show warning in production - handle gracefully
+        return []
 
 # --- App --- #
 
@@ -68,6 +82,7 @@ st.session_state.selected_model = user_data.get("selected_model", "gpt-4o")
 st.session_state.selected_llm_provider = user_data.get("selected_llm_provider", "OpenAI")
 st.session_state.openai_api_key = user_data.get("openai_api_key", "")
 st.session_state.openai_base_url = user_data.get("openai_base_url", "https://api.openai.com/v1")
+st.session_state.ollama_base_url = user_data.get("ollama_base_url", "http://localhost:11434")
 st.session_state.messages = user_data.get("messages", [])
 st.session_state.uploaded_document_content = user_data.get("uploaded_document_content", "")
 
@@ -102,19 +117,106 @@ with st.sidebar:
         save_user_data()
 
     st.header("LLM Provider")
-    llm_providers = ["Ollama", "OpenAI", "OpenAI Compatible"]
-    st.session_state.selected_llm_provider = st.selectbox("Select LLM Provider", llm_providers, index=llm_providers.index(st.session_state.selected_llm_provider))
+    llm_providers = ["OpenAI", "OpenAI Compatible", "Ollama"]
+
+    # Default to OpenAI if current provider is not available
+    current_provider = st.session_state.selected_llm_provider
+    if current_provider not in llm_providers:
+        current_provider = "OpenAI"
+        st.session_state.selected_llm_provider = current_provider
+
+    provider_index = llm_providers.index(current_provider) if current_provider in llm_providers else 0
+    st.session_state.selected_llm_provider = st.selectbox(
+        "Select LLM Provider",
+        llm_providers,
+        index=provider_index,
+        help="Choose your preferred LLM provider. OpenAI is recommended for production deployments."
+    )
     save_user_data()
 
     if st.session_state.selected_llm_provider == "Ollama":
-        st.header("Ollama Model Selection")
-        models = get_ollama_models()
-        selected_model_raw = st.selectbox("Select a model", models, index=models.index(st.session_state.selected_model) if st.session_state.selected_model in models else 0)
-        if not selected_model_raw.startswith("ollama/"):
-            st.session_state.selected_model = f"ollama/{selected_model_raw}"
+        st.header("Ollama Configuration")
+
+        # Check if Ollama is available
+        models = get_ollama_models(st.session_state.ollama_base_url)
+
+        if not models:
+            # Ollama is not available - show configuration options
+            st.error("⚠️ Ollama is not available")
+            st.info("Ollama is not running or not accessible. You have two options:")
+
+            with st.expander("Option 1: Use Ollama locally (Development)", expanded=True):
+                st.markdown("""
+                **For local development:**
+                1. Install Ollama from [ollama.ai](https://ollama.ai)
+                2. Start Ollama service: `ollama serve`
+                3. Pull a model: `ollama pull llama2`
+                4. Refresh this page
+                """)
+
+            with st.expander("Option 2: Use external Ollama service (Production)"):
+                st.markdown("**For production deployment:**")
+                ollama_url = st.text_input(
+                    "Ollama Service URL",
+                    value=st.session_state.ollama_base_url,
+                    help="Enter the URL of your Ollama service (e.g., http://your-ollama-server:11434)"
+                )
+
+                if ollama_url != st.session_state.ollama_base_url:
+                    st.session_state.ollama_base_url = ollama_url
+                    save_user_data()
+
+                if st.button("Test Connection"):
+                    if test_ollama_connection(ollama_url):
+                        st.success("✅ Connection successful!")
+                        st.session_state.ollama_base_url = ollama_url
+                        save_user_data()
+                        st.rerun()
+                    else:
+                        st.error("❌ Could not connect to Ollama service")
+
+            # Fallback: Allow manual model entry
+            st.markdown("**Or enter model name manually:**")
+            manual_model = st.text_input(
+                "Model Name",
+                value=st.session_state.selected_model if st.session_state.selected_model else "llama2",
+                help="Enter the Ollama model name (e.g., llama2, codellama, mistral)"
+            )
+
+            if manual_model:
+                if not manual_model.startswith("ollama/"):
+                    st.session_state.selected_model = f"ollama/{manual_model}"
+                else:
+                    st.session_state.selected_model = manual_model
+                save_user_data()
+                st.info(f"Using model: {st.session_state.selected_model}")
         else:
-            st.session_state.selected_model = selected_model_raw
-        save_user_data()
+            # Ollama is available - show model selection
+            st.success("✅ Ollama is available")
+
+            # Handle model selection
+            current_model = st.session_state.selected_model
+            if current_model and current_model.startswith("ollama/"):
+                current_model = current_model.replace("ollama/", "")
+
+            # Find the index for the current model
+            model_index = 0
+            if current_model and current_model in models:
+                model_index = models.index(current_model)
+
+            selected_model_raw = st.selectbox(
+                "Select a model",
+                models,
+                index=model_index,
+                help=f"Available models from Ollama service"
+            )
+
+            if selected_model_raw:
+                if not selected_model_raw.startswith("ollama/"):
+                    st.session_state.selected_model = f"ollama/{selected_model_raw}"
+                else:
+                    st.session_state.selected_model = selected_model_raw
+                save_user_data()
     elif st.session_state.selected_llm_provider == "OpenAI":
         st.header("OpenAI Configuration")
         openai_api_key = st.text_input(
@@ -217,7 +319,8 @@ if prompt := st.chat_input("Ask a question about your documents..."):
                     st.session_state.selected_model,
                     st.session_state.openai_api_key,
                     st.session_state.openai_base_url,
-                    st.session_state.uploaded_document_content if use_document else ""
+                    st.session_state.uploaded_document_content if use_document else "",
+                    st.session_state.ollama_base_url
                 )
                 response = result
             except Exception as e:
