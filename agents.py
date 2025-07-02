@@ -16,6 +16,34 @@ os.environ['LITELLM_LOG'] = log_level
 load_dotenv()
 
 
+def test_llm_connection(llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None):
+    """Test LLM connection with a simple prompt"""
+    try:
+        if llm_provider == "OpenAI Compatible":
+            import openai
+            client = openai.OpenAI(
+                api_key=openai_api_key,
+                base_url=openai_base_url
+            )
+
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "Hello, respond with 'OK' if you can hear me."}],
+                max_tokens=10,
+                temperature=0
+            )
+
+            if response.choices and response.choices[0].message.content:
+                print(f"LLM test successful: {response.choices[0].message.content}")
+                return True
+            else:
+                print("LLM test failed: Empty response")
+                return False
+
+    except Exception as e:
+        print(f"LLM test failed: {e}")
+        return False
+
 def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, ollama_base_url: str = None):
     """Initialize and return the LLM client based on the selected provider."""
     if llm_provider == "Ollama":
@@ -43,11 +71,42 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
             raise ValueError("API Key is required for OpenAI Compatible models.")
         if not openai_base_url:
             raise ValueError("Base URL is required for OpenAI Compatible models.")
-        return LLM(
-            model=f"openai/{model}",
-            api_key=openai_api_key,
-            base_url=openai_base_url
-        )
+
+        print(f"Configuring OpenAI Compatible LLM: {model} at {openai_base_url}")
+
+        # Special handling for different providers
+        config = {
+            "model": model,
+            "openai_api_key": openai_api_key,
+            "temperature": 0.1,
+            "max_tokens": 4000
+        }
+
+        # Try different base URL parameter names
+        try:
+            # First try with openai_api_base (CrewAI preferred)
+            config["openai_api_base"] = openai_base_url
+            return LLM(**config)
+        except Exception as e1:
+            print(f"First attempt failed: {e1}")
+            try:
+                # Second try with base_url
+                config.pop("openai_api_base", None)
+                config["base_url"] = openai_base_url
+                return LLM(**config)
+            except Exception as e2:
+                print(f"Second attempt failed: {e2}")
+                try:
+                    # Third try with minimal config
+                    minimal_config = {
+                        "model": model,
+                        "api_key": openai_api_key,
+                        "base_url": openai_base_url
+                    }
+                    return LLM(**minimal_config)
+                except Exception as e3:
+                    print(f"All attempts failed: {e3}")
+                    raise ValueError(f"Failed to configure LLM for {model} at {openai_base_url}. Errors: {e1}, {e2}, {e3}")
 
     else:
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")
@@ -167,16 +226,47 @@ def create_research_crew(query: str, llm_provider: str, model: str, openai_api_k
 
 def run_research(query: str, llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, document_content: str = "", ollama_base_url: str = None):
     """Run the research process and return results"""
-    print(f"Starting research for query: {query} with model: {model} using provider: {llm_provider}")
+    print(f"Starting research for query: {query}")
+    print(f"LLM Provider: {llm_provider}")
+    print(f"Model: {model}")
+    print(f"Base URL: {openai_base_url}")
+
     try:
+        # Test LLM connection first for OpenAI Compatible providers
+        if llm_provider == "OpenAI Compatible":
+            print("Testing LLM connection...")
+            if not test_llm_connection(llm_provider, model, openai_api_key, openai_base_url):
+                return f"LLM Connection Failed: Cannot connect to {model} at {openai_base_url}. Please verify:\n1. API key is correct\n2. Base URL is correct\n3. Model name is exact (case-sensitive)\n4. You have access to this model"
+
+        # Test LLM configuration
+        print("Creating LLM client...")
+        client = get_llm_client(llm_provider, model, openai_api_key, openai_base_url, ollama_base_url)
+        print("LLM client created successfully.")
+
+        # Create crew
+        print("Creating research crew...")
         crew = create_research_crew(query, llm_provider, model, openai_api_key, openai_base_url, document_content, ollama_base_url)
         print("Crew created successfully.")
+
+        # Execute research
+        print("Starting crew execution...")
         result = crew.kickoff()
-        print("Crew kickoff completed.")
-        return result.raw
+        print("Crew execution completed.")
+
+        if result and hasattr(result, 'raw') and result.raw:
+            return result.raw
+        else:
+            return "Research completed but no results were returned. This might be due to LLM configuration issues."
+
     except Exception as e:
-        print(f"An error occurred during research: {e}")
+        error_msg = str(e)
+        print(f"An error occurred during research: {error_msg}")
         import traceback
         traceback.print_exc()
-        return f"Error: {str(e)}"
+
+        # Provide more specific error messages
+        if "Invalid response from LLM call" in error_msg or "None or empty" in error_msg:
+            return f"LLM Configuration Error: The model '{model}' at '{openai_base_url}' is not responding properly. Please check:\n1. API key is valid\n2. Base URL is correct\n3. Model name is exact\n4. API provider supports the model\n\nOriginal error: {error_msg}"
+        else:
+            return f"Research Error: {error_msg}"
 

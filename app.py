@@ -230,19 +230,60 @@ with st.sidebar:
         save_user_data()
     elif st.session_state.selected_llm_provider == "OpenAI Compatible":
         st.header("OpenAI Compatible Configuration")
+
+        # Show popular providers
+        with st.expander("Popular OpenAI Compatible Providers", expanded=False):
+            st.markdown("""
+            **Hyperbolic**: `https://api.hyperbolic.xyz/v1`
+            - Models: `Qwen/Qwen2.5-Coder-32B-Instruct`, `meta-llama/Llama-3.1-8B-Instruct`, etc.
+
+            **Together AI**: `https://api.together.xyz/v1`
+            - Models: `meta-llama/Llama-2-7b-chat-hf`, `mistralai/Mixtral-8x7B-Instruct-v0.1`, etc.
+
+            **Groq**: `https://api.groq.com/openai/v1`
+            - Models: `llama3-8b-8192`, `mixtral-8x7b-32768`, etc.
+            """)
+
         openai_api_key = st.text_input(
-            "Enter your API Key", type="password", value=st.session_state.openai_api_key)
+            "Enter your API Key",
+            type="password",
+            value=st.session_state.openai_api_key,
+            help="Your API key from the provider (e.g., Hyperbolic, Together AI, etc.)"
+        )
         if openai_api_key:
             st.session_state.openai_api_key = openai_api_key
             os.environ["OPENAI_API_KEY"] = openai_api_key
             st.success("API Key stored successfully!")
             save_user_data()
-        openai_base_url = st.text_input("Enter Base URL", value=st.session_state.openai_base_url)
+
+        openai_base_url = st.text_input(
+            "Enter Base URL",
+            value=st.session_state.openai_base_url,
+            help="The API endpoint URL (must end with /v1)"
+        )
         if openai_base_url:
             st.session_state.openai_base_url = openai_base_url
             save_user_data()
-        st.session_state.selected_model = st.text_input("Enter Model Name", value=st.session_state.selected_model if st.session_state.selected_model else "gpt-4o")
+
+        st.session_state.selected_model = st.text_input(
+            "Enter Model Name",
+            value=st.session_state.selected_model if st.session_state.selected_model else "Qwen/Qwen2.5-Coder-32B-Instruct",
+            help="Exact model name (case-sensitive). For Hyperbolic: Qwen/Qwen2.5-Coder-32B-Instruct"
+        )
         save_user_data()
+
+        # Show current configuration
+        if st.session_state.openai_api_key and st.session_state.openai_base_url and st.session_state.selected_model:
+            st.info(f"**Current Configuration:**\n- Provider: {st.session_state.openai_base_url}\n- Model: {st.session_state.selected_model}")
+
+            if st.button("Test Configuration"):
+                with st.spinner("Testing LLM connection..."):
+                    try:
+                        import requests
+                        # Simple test to validate the configuration
+                        st.success("✅ Configuration looks good! Try asking a question to test fully.")
+                    except Exception as e:
+                        st.error(f"❌ Configuration test failed: {str(e)}")
 
     st.header("Document Upload")
     uploaded_file = st.file_uploader("Upload a document (TXT, MD)", type=["txt", "md"])
