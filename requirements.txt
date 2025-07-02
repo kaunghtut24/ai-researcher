@@ -1,4 +1,4 @@
-crewai>=0.114.0
+crewai>=0.114.0,<0.122.0
 linkup-sdk>=0.2.4
 mcp>=1.6.0
 openai>=1.75.0

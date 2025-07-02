@@ -4,7 +4,6 @@ services:
     env: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    # Remove buildCommand when using Docker - it's handled by Dockerfile
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
@@ -24,6 +23,4 @@ services:
         value: "info"
       - key: LITELLM_LOG
         value: "INFO"
-    # Render expects the service to run on port 10000
-    port: 10000
 
