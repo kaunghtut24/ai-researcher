@@ -1,5 +1,6 @@
 crewai==0.134.0
 linkup-sdk>=0.2.4
+litellm>=1.0.0
 mcp>=1.6.0
 openai>=1.75.0
 python-dotenv>=1.1.0
