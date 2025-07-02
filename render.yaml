@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: streamlit-app
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "streamlit run app.py"
+    envVars:
+      - key: LINKUP_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  - type: web
+    name: fast-api-server
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn server:mcp --host 0.0.0.0 --port 8000"
+    envVars:
+      - key: LINKUP_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
