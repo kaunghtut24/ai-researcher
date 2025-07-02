@@ -36,6 +36,8 @@ def load_user_data():
 
 # --- Model Selection --- #
 
+# NOTE: Ollama is assumed to be a separate service.
+# If running on Render, this will likely fail unless Ollama is also deployed and accessible.
 @st.cache_data
 def get_ollama_models():
     try:
@@ -43,8 +45,8 @@ def get_ollama_models():
         response.raise_for_status()
         return [model["name"] for model in response.json()["models"]]
     except Exception as e:
-        st.error(f"Could not get Ollama models: {e}")
-        return ["ollama/qwen3:8b", "ollama/llama2", "ollama/codellama"]
+        st.warning(f"Could not connect to Ollama at http://localhost:11434. Please ensure Ollama is running if you intend to use it. Error: {e}")
+        return [] # Return empty list if Ollama is not available
 
 # --- App --- #
 

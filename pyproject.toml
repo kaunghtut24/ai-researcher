@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Deep Research Agent using Crew AI and LinkUp API"
 readme = "README.md"
 requires-python = ">=3.11"
+
 dependencies = [
     "crewai>=0.114.0",
     "linkup-sdk>=0.2.4",
@@ -18,6 +19,6 @@ dependencies = [
     "requests",
 ]
 
-[tool.setuptools]
-py_modules = ["app", "agents", "server"]
-
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

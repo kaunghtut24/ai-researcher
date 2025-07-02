@@ -27,7 +27,6 @@ WORKDIR /app
 
 # Copy only files needed for installing dependencies first (to cache better)
 COPY pyproject.toml .
-COPY README.md .
 RUN pip install --upgrade pip setuptools wheel
 RUN pip install .
 

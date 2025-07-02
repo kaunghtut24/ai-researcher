@@ -17,9 +17,12 @@ load_dotenv()
 def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None):
     """Initialize and return the LLM client based on the selected provider."""
     if llm_provider == "Ollama":
+        # NOTE: Ollama base_url is set to localhost here. In a production environment
+        # like Render, this will need to be an accessible URL for your Ollama instance.
+        # If Ollama is running as a separate service, its URL should be provided here.
         return LLM(
             model=model,
-            base_url="http://localhost:11434"
+            # base_url="http://localhost:11434" # Removed for now, user needs to configure if external
         )
     elif llm_provider == "OpenAI":
         if not openai_api_key:
