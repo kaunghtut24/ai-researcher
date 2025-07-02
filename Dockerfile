@@ -2,8 +2,9 @@
 FROM python:3.12-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHON_VERSION=3.12
 
 # Install system dependencies required for WeasyPrint and general builds
 RUN apt-get update && apt-get install -y \

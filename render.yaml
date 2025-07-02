@@ -5,6 +5,7 @@ services:
     env: docker
     plan: free
     dockerfilePath: ./Dockerfile
+    dockerContext: ./
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
