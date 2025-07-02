@@ -1,4 +1,6 @@
 # Render deployment configuration for Agentic Deep Researcher
+# This is a Streamlit application deployed via Docker
+# Only this service should be deployed - ignore any auto-detected Python services
 services:
   - type: web
     name: agentic-deep-researcher

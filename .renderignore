@@ -1,0 +1,32 @@
+# Ignore MCP server file to prevent auto-detection
+mcp_server.py.disabled
+server.py
+
+# Ignore development files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.venv/
+venv/
+.env
+.env.local
+
+# Ignore user data
+user_data.json
+
+# Ignore source activation script
+source*
+
+# Ignore UV lock file
+uv.lock
+
+# Ignore documentation
+README.md
+*.md
+
+# Ignore git files
+.git/
+.gitignore
