@@ -25,13 +25,9 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Create an empty requirements.txt to satisfy Render's build process
-RUN touch requirements.txt
-
-# Copy only files needed for installing dependencies first (to cache better)
-COPY pyproject.toml .
-RUN pip install --upgrade pip setuptools wheel
-RUN pip install .
+# Copy requirements.txt and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the app
 COPY . .
