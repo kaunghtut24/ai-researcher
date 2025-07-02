@@ -26,8 +26,9 @@ def test_llm_connection(llm_provider: str, model: str, openai_api_key: str = Non
                 base_url=openai_base_url
             )
 
+            # Use the raw model name for direct OpenAI client testing
             response = client.chat.completions.create(
-                model=model,
+                model=model,  # Use original model name for direct API call
                 messages=[{"role": "user", "content": "Hello, respond with 'OK' if you can hear me."}],
                 max_tokens=10,
                 temperature=0
@@ -74,9 +75,14 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
 
         print(f"Configuring OpenAI Compatible LLM: {model} at {openai_base_url}")
 
-        # Special handling for different providers
+        # For OpenAI-compatible providers, LiteLLM requires the openai/ prefix
+        litellm_model = f"openai/{model}" if not model.startswith("openai/") else model
+
+        print(f"Using LiteLLM model format: {litellm_model}")
+
+        # Configuration for OpenAI-compatible providers
         config = {
-            "model": model,
+            "model": litellm_model,  # Use openai/ prefix for LiteLLM
             "openai_api_key": openai_api_key,
             "temperature": 0.1,
             "max_tokens": 4000
@@ -88,25 +94,30 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
             config["openai_api_base"] = openai_base_url
             return LLM(**config)
         except Exception as e1:
-            print(f"First attempt failed: {e1}")
+            print(f"First attempt with openai_api_base failed: {e1}")
             try:
                 # Second try with base_url
                 config.pop("openai_api_base", None)
                 config["base_url"] = openai_base_url
                 return LLM(**config)
             except Exception as e2:
-                print(f"Second attempt failed: {e2}")
+                print(f"Second attempt with base_url failed: {e2}")
                 try:
-                    # Third try with minimal config
-                    minimal_config = {
-                        "model": model,
-                        "api_key": openai_api_key,
-                        "base_url": openai_base_url
-                    }
-                    return LLM(**minimal_config)
+                    # Third try with api_base
+                    config.pop("base_url", None)
+                    config["api_base"] = openai_base_url
+                    return LLM(**config)
                 except Exception as e3:
-                    print(f"All attempts failed: {e3}")
-                    raise ValueError(f"Failed to configure LLM for {model} at {openai_base_url}. Errors: {e1}, {e2}, {e3}")
+                    print(f"Third attempt with api_base failed: {e3}")
+                    # Final attempt with environment variables
+                    import os
+                    os.environ["OPENAI_API_BASE"] = openai_base_url
+                    os.environ["OPENAI_API_KEY"] = openai_api_key
+                    try:
+                        return LLM(model=litellm_model, temperature=0.1, max_tokens=4000)
+                    except Exception as e4:
+                        print(f"Final attempt failed: {e4}")
+                        raise ValueError(f"Failed to configure LLM for {model} at {openai_base_url}. All configuration attempts failed.")
 
     else:
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")

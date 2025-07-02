@@ -272,18 +272,34 @@ with st.sidebar:
         )
         save_user_data()
 
-        # Show current configuration
+        # Show current configuration in a compact format
         if st.session_state.openai_api_key and st.session_state.openai_base_url and st.session_state.selected_model:
-            st.info(f"**Current Configuration:**\n- Provider: {st.session_state.openai_base_url}\n- Model: {st.session_state.selected_model}")
+            with st.expander("✅ Configuration Set", expanded=False):
+                # Extract provider name from URL for cleaner display
+                provider_name = "Unknown"
+                if "hyperbolic" in st.session_state.openai_base_url.lower():
+                    provider_name = "Hyperbolic"
+                elif "together" in st.session_state.openai_base_url.lower():
+                    provider_name = "Together AI"
+                elif "groq" in st.session_state.openai_base_url.lower():
+                    provider_name = "Groq"
+                elif "openai" in st.session_state.openai_base_url.lower():
+                    provider_name = "OpenAI"
 
-            if st.button("Test Configuration"):
-                with st.spinner("Testing LLM connection..."):
-                    try:
-                        import requests
-                        # Simple test to validate the configuration
-                        st.success("✅ Configuration looks good! Try asking a question to test fully.")
-                    except Exception as e:
-                        st.error(f"❌ Configuration test failed: {str(e)}")
+                st.markdown(f"""
+                **Provider:** {provider_name}
+                **Model:** `{st.session_state.selected_model}`
+                **URL:** `{st.session_state.openai_base_url}`
+                """)
+
+                if st.button("🧪 Test Configuration", use_container_width=True):
+                    with st.spinner("Testing LLM connection..."):
+                        try:
+                            import requests
+                            # Simple test to validate the configuration
+                            st.success("✅ Configuration looks good! Try asking a question to test fully.")
+                        except Exception as e:
+                            st.error(f"❌ Configuration test failed: {str(e)}")
 
     st.header("Document Upload")
     uploaded_file = st.file_uploader("Upload a document (TXT, MD)", type=["txt", "md"])
@@ -303,14 +319,42 @@ with col1:
     st.markdown("<h2 style='color: #0066cc;'>🔍 Agentic Deep Researcher</h2>",
                 unsafe_allow_html=True)
     powered_by_html = """
-    <div style='display: flex; align-items: center; gap: 10px; margin-top: 5px;'>
-        <span style='font-size: 20px; color: #666;'>Powered by</span>
-        <img src="https://cdn.prod.website-files.com/66cf2bfc3ed15b02da0ca770/66d07240057721394308addd_Logo%20(1).svg" width="80"> 
-        <span style='font-size: 20px; color: #666;'>and</span>
-        <img src="https://framerusercontent.com/images/wLLGrlJoyqYr9WvgZwzlw91A8U.png?scale-down-to=512" width="100">
+    <div style='display: flex; align-items: center; gap: 10px; margin-top: 5px; flex-wrap: wrap;'>
+        <span style='font-size: 16px; color: #666; font-weight: 500;'>Powered by</span>
+        <img src="https://cdn.prod.website-files.com/66cf2bfc3ed15b02da0ca770/66d07240057721394308addd_Logo%20(1).svg"
+             alt="LinkUp"
+             width="70"
+             height="auto"
+             style="max-height: 30px; object-fit: contain;">
+        <span style='font-size: 16px; color: #666; font-weight: 500;'>and</span>
+        <img src="https://framerusercontent.com/images/wLLGrlJoyqYr9WvgZwzlw91A8U.png?scale-down-to=512"
+             alt="CrewAI"
+             width="80"
+             height="auto"
+             style="max-height: 30px; object-fit: contain;">
     </div>
     """
-    st.markdown(powered_by_html, unsafe_allow_html=True)
+    try:
+        st.markdown(powered_by_html, unsafe_allow_html=True)
+    except Exception:
+        # Fallback using Streamlit components
+        powered_by_col1, powered_by_col2, powered_by_col3, powered_by_col4, powered_by_col5 = st.columns([2, 1, 1, 1, 2])
+        with powered_by_col1:
+            st.markdown("**Powered by**")
+        with powered_by_col2:
+            try:
+                st.image("https://cdn.prod.website-files.com/66cf2bfc3ed15b02da0ca770/66d07240057721394308addd_Logo%20(1).svg", width=70)
+            except:
+                st.markdown("[LinkUp](https://linkup.so)")
+        with powered_by_col3:
+            st.markdown("**and**")
+        with powered_by_col4:
+            try:
+                st.image("https://framerusercontent.com/images/wLLGrlJoyqYr9WvgZwzlw91A8U.png?scale-down-to=512", width=80)
+            except:
+                st.markdown("[CrewAI](https://crewai.com)")
+        with powered_by_col5:
+            st.write("")  # Empty column for spacing
 with col2:
     st.button("Clear ↺", on_click=reset_chat)
 
