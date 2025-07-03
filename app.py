@@ -6,6 +6,11 @@ from markdown_it import MarkdownIt
 import json
 import requests
 import io
+import logging
+
+# Suppress fontTools and WeasyPrint debug/info logs
+logging.getLogger("fontTools").setLevel(logging.WARNING)
+logging.getLogger("weasyprint").setLevel(logging.WARNING)
 
 # Try to import pyperclip, but handle gracefully if it fails (server environment)
 try:
@@ -365,27 +370,28 @@ st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
 for i, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        if message["role"] == "assistant":
-            col1, col2 = st.columns(2)
-            with col1:
-                st.download_button(
-                    label="Save as PDF",
-                    data=to_pdf(MarkdownIt().render(message["content"])),
-                    file_name=f"research_report_{i}.pdf",
-                    mime="application/pdf",
-                    key=f"download_pdf_{i}"
-                )
-            with col2:
-                if st.button("Copy", key=f"copy_{i}"):
-                    if CLIPBOARD_AVAILABLE:
-                        try:
-                            pyperclip.copy(message["content"])
-                            st.success("Copied to clipboard!")
-                        except Exception as e:
-                            st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
-                    else:
-                        st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
 
+# Only show download/copy for the latest assistant message
+if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
+    response = st.session_state.messages[-1]["content"]
+    unique_key = f"download_pdf_latest_{len(st.session_state.messages)}"
+    with st.chat_message("assistant"):  # Optionally show again for clarity
+        st.download_button(
+            label="Save as PDF",
+            data=to_pdf(MarkdownIt().render(response)),
+            file_name="research_report_latest.pdf",
+            mime="application/pdf",
+            key=unique_key
+        )
+        if CLIPBOARD_AVAILABLE:
+            if st.button("Copy", key=f"copy_latest_final_{len(st.session_state.messages)}"):
+                try:
+                    pyperclip.copy(response)
+                    st.success("Copied to clipboard!")
+                except Exception:
+                    st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
+        else:
+            st.warning("Clipboard not available in this environment. Use the text selection to copy manually.")
 
 # Accept user input and process the research query
 if prompt := st.chat_input("Ask a question about your documents..."):

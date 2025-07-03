@@ -79,7 +79,7 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
         logger.info("Configuring OpenAI LLM")
         return LLM(
             model=model,
-            openai_api_key=openai_api_key
+            api_key=openai_api_key
         )
 
     elif llm_provider == "OpenAI Compatible":
