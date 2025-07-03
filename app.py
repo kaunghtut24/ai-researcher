@@ -426,10 +426,10 @@ if prompt := st.chat_input("Ask a question about your documents..."):
                 data=to_pdf(MarkdownIt().render(response)),
                 file_name="research_report_latest.pdf",
                 mime="application/pdf",
-                key="download_pdf_latest"
+                key=f"download_pdf_latest_{len(st.session_state.messages)}_final"
             )
         with col2:
-            if st.button("Copy", key="copy_latest"):
+            if st.button("Copy", key=f"copy_latest_{len(st.session_state.messages)}_final"):
                 if CLIPBOARD_AVAILABLE:
                     try:
                         pyperclip.copy(response)
