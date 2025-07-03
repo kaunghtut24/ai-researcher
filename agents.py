@@ -6,50 +6,62 @@ from linkup import LinkupClient
 from crewai import Agent, Task, Crew, Process, LLM
 from crewai.tools import BaseTool
 import litellm
+import logging
 
 # Set logging level based on environment (DEBUG for development, INFO for production)
-import os
 log_level = os.getenv('LITELLM_LOG', 'INFO')
 os.environ['LITELLM_LOG'] = log_level
+
+# Configure logging for better debugging
+logging.basicConfig(level=getattr(logging, log_level.upper()))
+logger = logging.getLogger(__name__)
 
 # Load environment variables (for non-LinkUp settings)
 load_dotenv()
 
 
 def test_llm_connection(llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None):
-    """Test LLM connection with a simple prompt"""
+    """Test LLM connection with a simple prompt using LiteLLM"""
     try:
         if llm_provider == "OpenAI Compatible":
-            import openai
-            client = openai.OpenAI(
+            import litellm
+            
+            logger.info(f"Testing LLM connection for {model} at {openai_base_url}")
+            
+            # Set environment variables for LiteLLM
+            import os
+            os.environ["OPENAI_API_KEY"] = openai_api_key
+            os.environ["OPENAI_API_BASE"] = openai_base_url
+
+            # Test using LiteLLM with the same configuration as CrewAI
+            response = litellm.completion(
+                model=model,  # Use model name directly
+                messages=[{"role": "user", "content": "Hello, respond with 'OK' if you can hear me."}],
+                max_tokens=10,
+                temperature=0,
                 api_key=openai_api_key,
                 base_url=openai_base_url
             )
 
-            # Use the raw model name for direct OpenAI client testing
-            response = client.chat.completions.create(
-                model=model,  # Use original model name for direct API call
-                messages=[{"role": "user", "content": "Hello, respond with 'OK' if you can hear me."}],
-                max_tokens=10,
-                temperature=0
-            )
-
             if response.choices and response.choices[0].message.content:
-                print(f"LLM test successful: {response.choices[0].message.content}")
+                logger.info(f"LLM test successful: {response.choices[0].message.content}")
                 return True
             else:
-                print("LLM test failed: Empty response")
+                logger.error("LLM test failed: Empty response")
                 return False
 
     except Exception as e:
-        print(f"LLM test failed: {e}")
+        logger.error(f"LLM test failed: {e}")
         return False
 
 def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, ollama_base_url: str = None):
     """Initialize and return the LLM client based on the selected provider."""
+    logger.info(f"Initializing LLM client for provider: {llm_provider}, model: {model}")
+    
     if llm_provider == "Ollama":
         # Handle Ollama configuration
         base_url = ollama_base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        logger.info(f"Configuring Ollama at {base_url}")
 
         try:
             return LLM(
@@ -57,11 +69,14 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
                 base_url=base_url
             )
         except Exception as e:
+            logger.error(f"Failed to connect to Ollama at {base_url}: {e}")
             raise ValueError(f"Failed to connect to Ollama at {base_url}. Please ensure Ollama is running and accessible. Error: {str(e)}")
 
     elif llm_provider == "OpenAI":
         if not openai_api_key:
+            logger.error("OpenAI API Key is required for OpenAI models.")
             raise ValueError("OpenAI API Key is required for OpenAI models.")
+        logger.info("Configuring OpenAI LLM")
         return LLM(
             model=model,
             openai_api_key=openai_api_key
@@ -69,61 +84,67 @@ def get_llm_client(llm_provider: str, model: str, openai_api_key: str = None, op
 
     elif llm_provider == "OpenAI Compatible":
         if not openai_api_key:
+            logger.error("API Key is required for OpenAI Compatible models.")
             raise ValueError("API Key is required for OpenAI Compatible models.")
         if not openai_base_url:
+            logger.error("Base URL is required for OpenAI Compatible models.")
             raise ValueError("Base URL is required for OpenAI Compatible models.")
 
-        print(f"Configuring OpenAI Compatible LLM: {model} at {openai_base_url}")
+        logger.info(f"Configuring OpenAI Compatible LLM: {model} at {openai_base_url}")
 
         # Set up environment variables for LiteLLM
         import os
 
-        # For LiteLLM with custom endpoints, we MUST use the openai/ prefix
-        # This tells LiteLLM to use the OpenAI client with custom base URL
-        litellm_model = f"openai/{model}"
+        # For LiteLLM with custom endpoints, use the model name directly
+        # LiteLLM will automatically detect it's an OpenAI-compatible endpoint
+        litellm_model = model
 
-        print(f"Using LiteLLM model format: {litellm_model}")
-        print(f"Base URL: {openai_base_url}")
-        print(f"API Key: {'*' * (len(openai_api_key) - 4) + openai_api_key[-4:] if openai_api_key else 'None'}")
+        logger.info(f"Using LiteLLM model format: {litellm_model}")
+        logger.info(f"Base URL: {openai_base_url}")
+        logger.debug(f"API Key: {'*' * (len(openai_api_key) - 4) + openai_api_key[-4:] if openai_api_key else 'None'}")
 
         # Set environment variables that LiteLLM expects
         os.environ["OPENAI_API_KEY"] = openai_api_key
         os.environ["OPENAI_API_BASE"] = openai_base_url
 
         try:
-            # Use the openai/ prefix format that LiteLLM requires
+            # Use the correct parameter names for LiteLLM
+            logger.info("Attempting LLM configuration with base_url parameter")
             return LLM(
-                model=litellm_model,  # Must use openai/ prefix for custom endpoints
-                openai_api_key=openai_api_key,
-                openai_api_base=openai_base_url,
+                model=litellm_model,
+                api_key=openai_api_key,
+                base_url=openai_base_url,
                 temperature=0.1,
                 max_tokens=4000
             )
         except Exception as e1:
-            print(f"First attempt with openai_api_base failed: {e1}")
+            logger.warning(f"First attempt with base_url failed: {e1}")
             try:
-                # Fallback with different parameter name
+                # Fallback using environment variables only
+                logger.info("Attempting LLM configuration with environment variables only")
                 return LLM(
                     model=litellm_model,
-                    openai_api_key=openai_api_key,
-                    base_url=openai_base_url,
                     temperature=0.1,
                     max_tokens=4000
                 )
             except Exception as e2:
-                print(f"Second attempt with base_url failed: {e2}")
+                logger.warning(f"Second attempt with environment variables failed: {e2}")
                 try:
-                    # Final fallback using environment variables only
+                    # Final fallback using custom provider format
+                    logger.info("Attempting LLM configuration with openai/ prefix")
                     return LLM(
-                        model=litellm_model,
+                        model=f"openai/{model}",
+                        api_key=openai_api_key,
+                        base_url=openai_base_url,
                         temperature=0.1,
                         max_tokens=4000
                     )
                 except Exception as e3:
-                    print(f"All attempts failed: {e1}, {e2}, {e3}")
-                    raise ValueError(f"Failed to configure LLM for {model} at {openai_base_url}. LiteLLM requires 'openai/' prefix for custom endpoints.")
+                    logger.error(f"All attempts failed: {e1}, {e2}, {e3}")
+                    raise ValueError(f"Failed to configure LLM for {model} at {openai_base_url}. Please check your configuration and try again.")
 
     else:
+        logger.error(f"Unsupported LLM provider: {llm_provider}")
         raise ValueError(f"Unsupported LLM provider: {llm_provider}")
 
 # Define LinkUp Search Tool
@@ -241,47 +262,54 @@ def create_research_crew(query: str, llm_provider: str, model: str, openai_api_k
 
 def run_research(query: str, llm_provider: str, model: str, openai_api_key: str = None, openai_base_url: str = None, document_content: str = "", ollama_base_url: str = None):
     """Run the research process and return results"""
-    print(f"Starting research for query: {query}")
-    print(f"LLM Provider: {llm_provider}")
-    print(f"Model: {model}")
-    print(f"Base URL: {openai_base_url}")
+    logger.info(f"Starting research for query: {query}")
+    logger.info(f"LLM Provider: {llm_provider}")
+    logger.info(f"Model: {model}")
+    logger.info(f"Base URL: {openai_base_url}")
 
     try:
         # Test LLM connection first for OpenAI Compatible providers
         if llm_provider == "OpenAI Compatible":
-            print("Testing LLM connection...")
+            logger.info("Testing LLM connection...")
             if not test_llm_connection(llm_provider, model, openai_api_key, openai_base_url):
-                return f"LLM Connection Failed: Cannot connect to {model} at {openai_base_url}. Please verify:\n1. API key is correct\n2. Base URL is correct\n3. Model name is exact (case-sensitive)\n4. You have access to this model"
+                error_msg = f"LLM Connection Failed: Cannot connect to {model} at {openai_base_url}. Please verify:\n1. API key is correct\n2. Base URL is correct\n3. Model name is exact (case-sensitive)\n4. You have access to this model"
+                logger.error(error_msg)
+                return error_msg
 
         # Test LLM configuration
-        print("Creating LLM client...")
+        logger.info("Creating LLM client...")
         client = get_llm_client(llm_provider, model, openai_api_key, openai_base_url, ollama_base_url)
-        print("LLM client created successfully.")
+        logger.info("LLM client created successfully.")
 
         # Create crew
-        print("Creating research crew...")
+        logger.info("Creating research crew...")
         crew = create_research_crew(query, llm_provider, model, openai_api_key, openai_base_url, document_content, ollama_base_url)
-        print("Crew created successfully.")
+        logger.info("Crew created successfully.")
 
         # Execute research
-        print("Starting crew execution...")
+        logger.info("Starting crew execution...")
         result = crew.kickoff()
-        print("Crew execution completed.")
+        logger.info("Crew execution completed.")
 
         if result and hasattr(result, 'raw') and result.raw:
             return result.raw
         else:
+            logger.warning("Research completed but no results were returned. This might be due to LLM configuration issues.")
             return "Research completed but no results were returned. This might be due to LLM configuration issues."
 
     except Exception as e:
         error_msg = str(e)
-        print(f"An error occurred during research: {error_msg}")
+        logger.error(f"An error occurred during research: {error_msg}")
         import traceback
-        traceback.print_exc()
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
         # Provide more specific error messages
         if "Invalid response from LLM call" in error_msg or "None or empty" in error_msg:
-            return f"LLM Configuration Error: The model '{model}' at '{openai_base_url}' is not responding properly. Please check:\n1. API key is valid\n2. Base URL is correct\n3. Model name is exact\n4. API provider supports the model\n\nOriginal error: {error_msg}"
+            specific_error = f"LLM Configuration Error: The model '{model}' at '{openai_base_url}' is not responding properly. Please check:\n1. API key is valid\n2. Base URL is correct\n3. Model name is exact\n4. API provider supports the model\n\nOriginal error: {error_msg}"
+            logger.error(specific_error)
+            return specific_error
         else:
-            return f"Research Error: {error_msg}"
+            general_error = f"Research Error: {error_msg}"
+            logger.error(general_error)
+            return general_error
 
